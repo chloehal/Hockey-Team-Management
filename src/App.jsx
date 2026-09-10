@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { House, ClipboardCheck, Users, Shield, BookOpen } from "lucide-react";
+import { House, ClipboardCheck, Users, BookOpen } from "lucide-react";
 import { useTeam } from "./hooks/useTeam";
 import { Button, Heading, Section } from "./components/shared";
 import Team from "./pages/Team";
@@ -12,7 +12,6 @@ const routes = [
   ["attendance", "Présences", ClipboardCheck],
   ["match", "Match", Users],
   ["rules", "Fonctionnement", BookOpen],
-  ["coach", "Coach", Shield],
 ];
 const routeNow = () =>
   location.hash.slice(2) ||
@@ -71,9 +70,6 @@ export default function App() {
         <a className="brand" href="#/team">
           <img src={`${import.meta.env.BASE_URL}favicon.svg`} alt="" />
           les panthères
-        </a>
-        <a href="#/coach" aria-label="Espace coach">
-          <Shield size={19} />
         </a>
       </header>
       <main id="main" tabIndex={-1}>

@@ -14,6 +14,7 @@ test.beforeEach(async ({ page }) => {
 test("navigation et absence de débordement sur mobile", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 740 });
   await page.goto("/");
+  await expect(page.getByRole("link", { name: /coach/i })).toHaveCount(0);
   for (const [route, title] of [
     ["team", "La vie de l’équipe."],
     ["attendance", "Présentes sur le terrain."],
