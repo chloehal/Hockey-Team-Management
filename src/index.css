@@ -301,6 +301,26 @@
     margin-bottom: 16px;
     border-bottom: 1px solid var(--border);
   }
+  .referee-count {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 48px;
+    padding: 4px 8px;
+    border: 1px solid var(--border);
+    background: var(--muted);
+    color: var(--foreground);
+    font-size: 13px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  .referee-count[data-complete="true"] {
+    background: #eff3e9;
+    color: #294622;
+    border-color: #d5dfcd;
+  }
   .ref-date h3 {
     font-size: 13px;
   }

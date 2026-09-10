@@ -137,7 +137,11 @@ export default function Team({ team }) {
                   <h3>
                     {dateLabel(m.date)} · {m.time}
                   </h3>
-                  <span className={refs.length === 2 ? "status" : "muted"}>
+                  <span
+                    className="referee-count"
+                    data-complete={refs.length === 2}
+                    aria-label={`${refs.length} arbitres inscrits sur 2`}
+                  >
                     {refs.length}/2
                   </span>
                 </div>
