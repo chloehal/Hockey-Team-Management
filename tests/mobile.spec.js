@@ -17,7 +17,7 @@ test("navigation et absence de débordement sur mobile", async ({ page }) => {
   await expect(page.getByRole("link", { name: /coach/i })).toHaveCount(0);
   for (const [route, title] of [
     ["team", "La vie de l’équipe."],
-    ["attendance", "Présentes sur le terrain."],
+    ["attendance", "Présences aux entraînements."],
     ["match", "La feuille de match."],
     ["rules", "Notre fonctionnement."],
     ["coach", "Espace coach."],
@@ -91,7 +91,7 @@ test("la feuille reste disponible après un changement d’onglet", async ({
     .getByRole("link", { name: "Présences", exact: true })
     .click();
   await page
-    .getByRole("heading", { name: "Présentes sur le terrain." })
+    .getByRole("heading", { name: "Présences aux entraînements." })
     .waitFor();
   await page
     .getByRole("navigation", { name: "Navigation mobile" })

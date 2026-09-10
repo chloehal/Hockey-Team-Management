@@ -116,9 +116,6 @@ export default function App() {
         ) : (
           <Team team={team} />
         )}
-        <footer className="page-footer">
-          Les Panthères · L’équipe avant tout.
-        </footer>
       </main>
       <nav className="mobile-nav" aria-label="Navigation mobile">
         {routes.map(([key, label, Icon]) => (

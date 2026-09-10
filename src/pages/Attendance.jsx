@@ -23,7 +23,7 @@ export default function Attendance({ team }) {
   return (
     <>
       <Heading
-        title="Présentes sur le terrain."
+        title="Présences aux entraînements."
         description="Un pointage par séance, partagé avec toute l’équipe."
       />
       <Section
