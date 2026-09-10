@@ -237,8 +237,8 @@ export default function Rules() {
           </div>
 
           <p>
-            Chaque joueuse verse <strong>34 EUR</strong> en debut de saison pour
-            couvrir les boissons offertes aux adversaires.
+            Chaque joueuse verse 2 cotis pour couvrir les boissons offertes aux
+            adversaires.
             <strong>
               L'équipe s'engage à offrir 1 mètre de bière aux adversaires ; si
               des softs sont demandés, ils remplacent les bières du mètre.
