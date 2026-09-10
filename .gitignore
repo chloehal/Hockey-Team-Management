@@ -1,2 +1,9 @@
 .superpowers/
 config.php
+
+node_modules/
+dist/
+artifacts/
+test-results/
+playwright-report/
+.env*
