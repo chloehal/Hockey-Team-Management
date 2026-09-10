@@ -1,3 +1,4 @@
+import { normalizeEvaluation } from "../src/lib/evaluations.js";
 export const demoTeam = {
   players: Array.from({ length: 19 }, (_, i) => ({
     id: i + 1,
@@ -62,6 +63,24 @@ export function demoResponse(data, action, input) {
     get_notes: "notes",
     get_referees: "referees",
   };
+  if (
+    action === "get_player_evaluations" ||
+    action === "save_player_evaluation"
+  ) {
+    if (input.password !== "demo")
+      return { error: "Accès coach requis pour les évaluations." };
+    data.evaluations ||= {};
+    if (action === "get_player_evaluations") return data.evaluations;
+    if (!data.players.some((p) => p.id === input.id))
+      return { error: "Joueuse introuvable" };
+    try {
+      const scores = normalizeEvaluation(input.scores);
+      data.evaluations[input.id] = scores;
+      return { ok: true, scores };
+    } catch (error) {
+      return { error: error.message };
+    }
+  }
   if (getters[action]) return data[getters[action]];
   if (action === "verify_coach_password")
     return { ok: input.password === "demo" };

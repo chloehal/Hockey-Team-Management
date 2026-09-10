@@ -102,3 +102,40 @@ test("la feuille reste disponible après un changement d’onglet", async ({
     page.getByText("19 sélectionnées", { exact: true }),
   ).toBeVisible();
 });
+
+test("les sept notes et leur moyenne sont enregistrées uniquement côté coach", async ({
+  page,
+}) => {
+  await page.goto("/coach.html");
+  await page.getByLabel("Mot de passe coach", { exact: true }).fill("demo");
+  await page.getByRole("button", { name: "Ouvrir l’espace coach" }).click();
+  const editor = page
+    .locator('[data-slot="card"]')
+    .filter({ has: page.getByText("#1 · Alice Martin", { exact: true }) });
+  for (const label of [
+    "Technique",
+    "Physique",
+    "Stratégie",
+    "Placement",
+    "Esprit d’équipe",
+    "Puissance",
+    "Précision",
+  ])
+    await editor.getByLabel(label, { exact: true }).fill("8");
+  await expect(editor.locator(".evaluation-average")).toContainText("8 /10");
+  await editor
+    .getByRole("button", { name: "Enregistrer l’évaluation" })
+    .click();
+  await expect(editor.getByRole("status")).toHaveText(
+    "Évaluation enregistrée.",
+  );
+  await page.reload();
+  await page.getByLabel("Mot de passe coach", { exact: true }).fill("demo");
+  await page.getByRole("button", { name: "Ouvrir l’espace coach" }).click();
+  await expect(editor.getByLabel("Précision", { exact: true })).toHaveValue(
+    "8",
+  );
+  const cache = await page.evaluate(() => JSON.stringify(localStorage));
+  expect(cache).not.toContain("esprit_equipe");
+  expect(cache).not.toContain('"password"');
+});

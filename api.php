@@ -11,6 +11,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 switch ($action) {
+    case 'get_player_evaluations':
+    case 'save_player_evaluation':
+        require_once __DIR__ . '/player-evaluations.php';
+        handle_player_evaluations($pdo, $action, $input);
+        break;
+
 
     // ===================== PLAYERS =====================
     case 'get_players':

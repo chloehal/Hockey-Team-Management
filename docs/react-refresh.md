@@ -6,7 +6,7 @@ Remplacer les deux pages HTML avec scripts intégrés par une application React 
 
 ## Décisions
 
-L’API PHP et le schéma restent inchangés. Les écrans coach et équipe partagent le même moteur de sélection, extrait de la version coach qui détaille déjà les motifs. Le calcul devient pur : les annotations de match n’altèrent pas les fiches reçues de l’API. Les choix et disponibilités d’un match restent locaux, comme auparavant.
+Le schéma reste inchangé. L’API PHP historique est conservée et étendue par deux actions protégées pour les évaluations coach dans la table settings existante. Les écrans coach et équipe partagent le même moteur de sélection, extrait de la version coach qui détaille déjà les motifs. Le calcul devient pur : les annotations de match n’altèrent pas les fiches reçues de l’API. Les choix et disponibilités d’un match restent locaux, comme auparavant.
 
 Les composants React rendent toutes les données utilisateur comme texte. Les règles statiques sont des composants JSX. Les erreurs HTTP et JSON restent visibles dans les formulaires, sans effacer leur saisie. Les changements sont sérialisés et suivis d’un rechargement des ressources.
 

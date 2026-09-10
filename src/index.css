@@ -655,3 +655,50 @@
     }
   }
 }
+
+@layer components {
+  .player-evaluation {
+    border-top: 1px solid var(--border);
+    margin-top: 24px;
+    padding-top: 20px;
+  }
+  .player-evaluation .section-header {
+    margin-bottom: 20px;
+  }
+  .evaluation-average {
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .evaluation-average strong {
+    display: block;
+    font-size: 26px;
+    font-variant-numeric: tabular-nums;
+  }
+  .evaluation-average small {
+    font-size: 13px;
+    font-weight: 400;
+    color: var(--muted-foreground);
+  }
+  .evaluation-average span {
+    display: block;
+    font-size: 11px;
+    color: var(--muted-foreground);
+  }
+  .evaluation-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+  }
+  @media (max-width: 700px) {
+    .evaluation-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .player-evaluation .section-header {
+      display: block;
+    }
+    .evaluation-average {
+      text-align: left;
+      margin-top: 12px;
+    }
+  }
+}

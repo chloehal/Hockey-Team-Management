@@ -12,13 +12,19 @@ import {
 import { request } from "../lib/api";
 import { POS_FULL_LABELS } from "../lib/selection";
 import Match from "./Match";
-function PlayerEditor({ player, team }) {
+import PlayerEvaluation from "../components/PlayerEvaluation";
+function PlayerEditor({
+  player,
+  team,
+  evaluation,
+  saveEvaluation,
+  evaluationsReady,
+}) {
   const [positions, setPositions] = useState([
-      player.position_1 || "",
-      player.position_2 || "",
-      player.position_3 || "",
-    ]),
-    [level, setLevel] = useState(String(player.level || 2));
+    player.position_1 || "",
+    player.position_2 || "",
+    player.position_3 || "",
+  ]);
   return (
     <Section
       title={`${player.number ? `#${player.number} · ` : ""}${player.name}`}
@@ -31,7 +37,7 @@ function PlayerEditor({ player, team }) {
             position_1: positions[0] || null,
             position_2: positions[1] || null,
             position_3: positions[2] || null,
-            level: Number(level),
+            level: Number(player.level || 2),
           })
         }
       >
@@ -50,18 +56,15 @@ function PlayerEditor({ player, team }) {
               ]}
             />
           ))}
-          <Choice
-            label="Niveau"
-            value={level}
-            onChange={setLevel}
-            options={[
-              ["1", "1 · Confirmée"],
-              ["2", "2 · Intermédiaire"],
-              ["3", "3 · En progression"],
-            ]}
-          />
         </div>
       </SaveForm>
+      {evaluationsReady && (
+        <PlayerEvaluation
+          initial={evaluation}
+          disabled={team.busy || team.offline}
+          save={saveEvaluation}
+        />
+      )}
       <Confirm
         title={`Supprimer ${player.name} ?`}
         disabled={team.busy || team.offline}
@@ -73,13 +76,34 @@ function PlayerEditor({ player, team }) {
 export default function Coach({ team, draft, setDraft }) {
   const [unlocked, setUnlocked] = useState(false),
     [tab, setTab] = useState("players"),
-    [formKey, setFormKey] = useState(0);
+    [formKey, setFormKey] = useState(0),
+    [password, setPassword] = useState(""),
+    [evaluations, setEvaluations] = useState(null),
+    [evaluationError, setEvaluationError] = useState("");
+  async function loadEvaluations(credential) {
+    setEvaluationError("");
+    try {
+      setEvaluations(
+        await request("get_player_evaluations", { password: credential }),
+      );
+    } catch (error) {
+      setEvaluationError(error.message);
+    }
+  }
+  function lock() {
+    setUnlocked(false);
+    setPassword("");
+    setEvaluations(null);
+    setEvaluationError("");
+    setDraft((old) => ({ ...old, result: null }));
+  }
+
   if (!unlocked)
     return (
       <>
         <Heading
           title="Espace coach."
-          description="Retrouve les postes, les niveaux et les outils de sélection."
+          description="Retrouve les postes, les évaluations et les outils de sélection."
         />
         <Section title="Accès coach">
           <SaveForm
@@ -89,7 +113,10 @@ export default function Coach({ team, draft, setDraft }) {
                 password: f.get("password"),
               });
               if (!result.ok) throw new Error("Mot de passe incorrect.");
+              const credential = String(f.get("password"));
+              setPassword(credential);
               setUnlocked(true);
+              await loadEvaluations(credential);
             }}
           >
             <Field
@@ -109,10 +136,18 @@ export default function Coach({ team, draft, setDraft }) {
         title="Côté coach."
         description="Gérer l’effectif et préparer les rencontres."
       >
-        <Button variant="outline" onClick={() => setUnlocked(false)}>
+        <Button variant="outline" onClick={lock}>
           Verrouiller
         </Button>
       </Heading>
+      {evaluationError && (
+        <div className="error" role="alert">
+          {evaluationError}
+          <Button variant="outline" onClick={() => loadEvaluations(password)}>
+            Recharger les évaluations
+          </Button>
+        </div>
+      )}
       <div className="toolbar">
         {[
           ["players", "Joueuses"],
@@ -130,7 +165,13 @@ export default function Coach({ team, draft, setDraft }) {
         ))}
       </div>
       {tab === "match" ? (
-        <Match team={team} coach draft={draft} setDraft={setDraft} />
+        <Match
+          team={team}
+          coach
+          evaluations={evaluations}
+          draft={draft}
+          setDraft={setDraft}
+        />
       ) : tab === "players" ? (
         <>
           <Section title="Ajouter une joueuse">
@@ -150,7 +191,22 @@ export default function Coach({ team, draft, setDraft }) {
             </SaveForm>
           </Section>
           {team.data.players.map((p) => (
-            <PlayerEditor key={p.id} player={p} team={team} />
+            <PlayerEditor
+              key={p.id}
+              player={p}
+              team={team}
+              evaluationsReady={evaluations !== null}
+              evaluation={evaluations?.[p.id]}
+              saveEvaluation={async (scores) => {
+                const result = await request("save_player_evaluation", {
+                  id: p.id,
+                  scores,
+                  password,
+                });
+                setEvaluations((old) => ({ ...old, [p.id]: result.scores }));
+                setDraft((old) => ({ ...old, result: null }));
+              }}
+            />
           ))}
         </>
       ) : tab === "trainings" ? (
@@ -182,7 +238,7 @@ export default function Coach({ team, draft, setDraft }) {
                 old_password: f.get("old_password"),
                 new_password: f.get("new_password"),
               });
-              setUnlocked(false);
+              lock();
             }}
           >
             <Field

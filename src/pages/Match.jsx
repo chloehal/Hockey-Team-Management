@@ -21,7 +21,13 @@ import {
   GROUP_LABELS,
 } from "../lib/selection";
 import { exportMatch } from "../lib/export-match";
-export default function Match({ team, coach = false, draft, setDraft }) {
+export default function Match({
+  team,
+  coach = false,
+  evaluations,
+  draft,
+  setDraft,
+}) {
   const { data, offline } = team;
   const { available, result } = draft;
   const setAvailable = (available) =>
@@ -34,7 +40,7 @@ export default function Match({ team, coach = false, draft, setDraft }) {
   const [pending, setPending] = useState(null),
     [exportError, setExportError] = useState("");
   function finish(scored, goalie) {
-    setResult(selectMatch(scored, data.trainings, goalie));
+    setResult(selectMatch(scored, data.trainings, goalie, evaluations));
     setPending(null);
   }
   function generate() {
@@ -84,7 +90,11 @@ export default function Match({ team, coach = false, draft, setDraft }) {
     <>
       <Heading
         title={coach ? "Préparer la sélection." : "La feuille de match."}
-        description="Disponibilités, présences, composition : jusqu’à 16 joueuses."
+        description={
+          coach
+            ? "Présences, postes, puis moyenne sur 10 à priorité égale. Les sept notes doivent être remplies pour toutes les joueuses à départager."
+            : "Disponibilités, présences, composition : jusqu’à 16 joueuses."
+        }
       />
       <Section
         title="Qui est disponible ?"
@@ -97,7 +107,7 @@ export default function Match({ team, coach = false, draft, setDraft }) {
         />
         <Button
           className="mt-5"
-          disabled={!available.length || offline}
+          disabled={!available.length || offline || (coach && !evaluations)}
           onClick={generate}
         >
           Générer la sélection

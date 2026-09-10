@@ -1,3 +1,4 @@
+import { evaluationSummary } from "./evaluations.js";
 export const POS_LABELS = {
   gardienne: "G",
   defense_centrale: "DC",
@@ -56,7 +57,7 @@ function isGoalkeeper(p) {
   return p.position_1 === "gardienne";
 }
 
-export function selectMatch(input, trainings, chosenGoalieId) {
+export function selectMatch(input, trainings, chosenGoalieId, evaluations) {
   const scored = input.map((p) => ({ ...p }));
   const maxT3 = Math.min(3, trainings.length),
     maxT5 = Math.min(5, trainings.length);
@@ -225,7 +226,7 @@ export function selectMatch(input, trainings, chosenGoalieId) {
           const grp = pos && POS_GROUPS[pos];
           if (grp && remainingNeeds[grp] > 0) posScore += slot.weight;
         }
-        const levelScore = 3 - (p.level || 2);
+        const levelScore = evaluations ? 0 : 3 - (p.level || 2);
         let specificNeed = 0;
         if (p.position_1 && POS_MAXIMUMS[p.position_1] !== undefined) {
           specificNeed =
@@ -241,6 +242,24 @@ export function selectMatch(input, trainings, chosenGoalieId) {
         const { score, exceed } = computeScore(p);
         p._score = score;
         p._exceed = exceed;
+      }
+      if (evaluations) {
+        // Only compare complete evaluations within the same composition priority.
+        // An unevaluated player is never assigned an invented zero.
+        const groups = new Map();
+        for (const p of tied)
+          groups.set(p._score, [...(groups.get(p._score) || []), p]);
+        for (const group of groups.values()) {
+          const averages = group.map(
+            (p) => evaluationSummary(evaluations[p.id] || {}).average,
+          );
+          if (averages.every((average) => average !== null)) {
+            group.forEach((p, index) => {
+              p._score += averages[index] / 100;
+              p._evaluationAverage = averages[index];
+            });
+          }
+        }
       }
       tied.sort((a, b) => b._score - a._score);
 
@@ -272,7 +291,17 @@ export function selectMatch(input, trainings, chosenGoalieId) {
                 "/" +
                 maxT5 +
                 ") → departage par composition";
-              if ((p.level || 2) !== 2) r += " et niveau (" + p.level + ")";
+              if (evaluations)
+                r +=
+                  p._evaluationAverage !== undefined
+                    ? " puis moyenne (" +
+                      p._evaluationAverage.toLocaleString("fr-FR", {
+                        maximumFractionDigits: 1,
+                      }) +
+                      "/10)"
+                    : " (évaluations incomplètes : départage par notes indisponible)";
+              else if ((p.level || 2) !== 2)
+                r += " et niveau (" + p.level + ")";
               r += ".";
               p._reason = r;
             }
@@ -298,8 +327,11 @@ export function selectMatch(input, trainings, chosenGoalieId) {
               "/" +
               maxT5 +
               ")";
-            r +=
-              ", meme score de composition et niveau (" + (p.level || 2) + ")";
+            r += evaluations
+              ? ", même priorité de composition et moyennes égales ou incomplètes"
+              : ", meme score de composition et niveau (" +
+                (p.level || 2) +
+                ")";
             r += ". En competition avec " + others.join(", ");
             r +=
               " pour " +
@@ -310,6 +342,7 @@ export function selectMatch(input, trainings, chosenGoalieId) {
             p._reason = r;
             deliberation.push(p);
           }
+          if (evaluations) spotsRemaining = 0;
         }
         i = j;
       }
