@@ -702,3 +702,46 @@
     }
   }
 }
+
+@layer components {
+  .player-collapse {
+    padding-block: 0;
+    gap: 0;
+  }
+  .player-collapse summary {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px 20px;
+    min-height: 60px;
+    cursor: pointer;
+    list-style: none;
+  }
+  .player-collapse summary::-webkit-details-marker {
+    display: none;
+  }
+  .player-collapse summary strong {
+    flex: 1;
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .player-collapse-average {
+    color: var(--muted-foreground);
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .player-collapse summary svg {
+    flex-shrink: 0;
+  }
+  .player-collapse details[open] > summary svg {
+    transform: rotate(180deg);
+  }
+  .player-collapse summary:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: -3px;
+  }
+  .player-collapse-content {
+    padding: 20px;
+    border-top: 1px solid var(--border);
+  }
+}

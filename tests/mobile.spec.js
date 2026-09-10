@@ -112,6 +112,10 @@ test("les sept notes et leur moyenne sont enregistrées uniquement côté coach"
   const editor = page
     .locator('[data-slot="card"]')
     .filter({ has: page.getByText("#1 · Alice Martin", { exact: true }) });
+  await expect(
+    editor.getByLabel("Technique", { exact: true }),
+  ).not.toBeVisible();
+  await editor.locator("summary").click();
   for (const label of [
     "Technique",
     "Physique",
@@ -122,6 +126,12 @@ test("les sept notes et leur moyenne sont enregistrées uniquement côté coach"
     "Précision",
   ])
     await editor.getByLabel(label, { exact: true }).fill("8");
+  await editor.locator("summary").click();
+  await editor.locator("summary").focus();
+  await page.keyboard.press("Enter");
+  await expect(editor.getByLabel("Technique", { exact: true })).toHaveValue(
+    "8",
+  );
   await expect(editor.locator(".evaluation-average")).toContainText("8 /10");
   await editor
     .getByRole("button", { name: "Enregistrer l’évaluation" })
@@ -132,6 +142,8 @@ test("les sept notes et leur moyenne sont enregistrées uniquement côté coach"
   await page.reload();
   await page.getByLabel("Mot de passe coach", { exact: true }).fill("demo");
   await page.getByRole("button", { name: "Ouvrir l’espace coach" }).click();
+  await expect(editor.locator("summary")).toContainText("8 /10");
+  await editor.locator("summary").click();
   await expect(editor.getByLabel("Précision", { exact: true })).toHaveValue(
     "8",
   );

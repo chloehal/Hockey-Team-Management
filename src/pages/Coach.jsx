@@ -1,5 +1,6 @@
 import { useState } from "react";
 import {
+  Card,
   Heading,
   Section,
   Field,
@@ -9,6 +10,8 @@ import {
   Button,
   dateLabel,
 } from "../components/shared";
+import { ChevronDown } from "lucide-react";
+import { evaluationSummary } from "../lib/evaluations";
 import { request } from "../lib/api";
 import { POS_FULL_LABELS } from "../lib/selection";
 import Match from "./Match";
@@ -25,52 +28,66 @@ function PlayerEditor({
     player.position_2 || "",
     player.position_3 || "",
   ]);
+  const { average } = evaluationSummary(evaluation || {});
   return (
-    <Section
-      title={`${player.number ? `#${player.number} · ` : ""}${player.name}`}
-    >
-      <SaveForm
-        disabled={team.busy || team.offline}
-        onSave={() =>
-          team.mutate("update_player_details", {
-            id: player.id,
-            position_1: positions[0] || null,
-            position_2: positions[1] || null,
-            position_3: positions[2] || null,
-            level: Number(player.level || 2),
-          })
-        }
-      >
-        <div className="form-grid">
-          {positions.map((pos, i) => (
-            <Choice
-              key={i}
-              label={`Poste ${i + 1}`}
-              value={pos}
-              onChange={(v) =>
-                setPositions((old) => old.map((p, j) => (j === i ? v : p)))
-              }
-              options={[
-                ["", "Non renseigné"],
-                ...Object.entries(POS_FULL_LABELS),
-              ]}
+    <Card className="player-collapse">
+      <details>
+        <summary>
+          <strong>{`${player.number ? `#${player.number} · ` : ""}${player.name}`}</strong>
+          <span className="player-collapse-average">
+            {!evaluationsReady
+              ? "…"
+              : average === null
+                ? "Non évaluée"
+                : `${average.toLocaleString("fr-BE", { maximumFractionDigits: 1 })} /10`}
+          </span>
+          <ChevronDown size={18} aria-hidden="true" />
+        </summary>
+        <div className="player-collapse-content">
+          <SaveForm
+            disabled={team.busy || team.offline}
+            onSave={() =>
+              team.mutate("update_player_details", {
+                id: player.id,
+                position_1: positions[0] || null,
+                position_2: positions[1] || null,
+                position_3: positions[2] || null,
+                level: Number(player.level || 2),
+              })
+            }
+          >
+            <div className="form-grid">
+              {positions.map((pos, i) => (
+                <Choice
+                  key={i}
+                  label={`Poste ${i + 1}`}
+                  value={pos}
+                  onChange={(v) =>
+                    setPositions((old) => old.map((p, j) => (j === i ? v : p)))
+                  }
+                  options={[
+                    ["", "Non renseigné"],
+                    ...Object.entries(POS_FULL_LABELS),
+                  ]}
+                />
+              ))}
+            </div>
+          </SaveForm>
+          {evaluationsReady && (
+            <PlayerEvaluation
+              initial={evaluation}
+              disabled={team.busy || team.offline}
+              save={saveEvaluation}
             />
-          ))}
+          )}
+          <Confirm
+            title={`Supprimer ${player.name} ?`}
+            disabled={team.busy || team.offline}
+            onConfirm={() => team.mutate("delete_player", { id: player.id })}
+          />
         </div>
-      </SaveForm>
-      {evaluationsReady && (
-        <PlayerEvaluation
-          initial={evaluation}
-          disabled={team.busy || team.offline}
-          save={saveEvaluation}
-        />
-      )}
-      <Confirm
-        title={`Supprimer ${player.name} ?`}
-        disabled={team.busy || team.offline}
-        onConfirm={() => team.mutate("delete_player", { id: player.id })}
-      />
-    </Section>
+      </details>
+    </Card>
   );
 }
 export default function Coach({ team, draft, setDraft }) {
