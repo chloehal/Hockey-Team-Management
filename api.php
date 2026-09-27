@@ -1,6 +1,7 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
 require_once __DIR__ . '/config.php';
+require_once __DIR__ . '/coach-auth.php';
 
 $action = $_GET['action'] ?? '';
 
@@ -38,6 +39,8 @@ switch ($action) {
         break;
 
     case 'delete_player':
+        // Deleting a player also deletes their attendance via ON DELETE CASCADE.
+        if (!require_coach_access($pdo, $input)) break;
         $id = (int)($input['id'] ?? 0);
         $stmt = $pdo->prepare('DELETE FROM players WHERE id = ?');
         $stmt->execute([$id]);
@@ -86,13 +89,24 @@ switch ($action) {
         break;
 
     case 'save_training':
-        $date = $input['date'] ?? '';
-        $presentIds = $input['presentIds'] ?? [];
-        if ($date === '') {
-            http_response_code(400);
-            echo json_encode(['error' => 'Date requise']);
+        if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+            http_response_code(405);
+            echo json_encode(['error' => 'Méthode POST requise.']);
             break;
         }
+        $date = $input['date'] ?? '';
+        $presentIds = $input['presentIds'] ?? [];
+        if (!is_string($date) || !preg_match('/^\d{4}-\d{2}-\d{2}$/D', $date) || !checkdate((int)substr($date, 5, 2), (int)substr($date, 8, 2), (int)substr($date, 0, 4))) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Date invalide']);
+            break;
+        }
+        if (!is_array($presentIds) || array_filter($presentIds, fn($id) => filter_var($id, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1]]) === false)) {
+            http_response_code(400);
+            echo json_encode(['error' => 'Liste des présences invalide']);
+            break;
+        }
+        $presentIds = array_unique(array_map('intval', $presentIds));
 
         // Check if training exists for this date
         $stmt = $pdo->prepare('SELECT id FROM trainings WHERE date = ?');
@@ -100,12 +114,20 @@ switch ($action) {
         $existing = $stmt->fetch();
 
         if ($existing) {
+            if (!require_coach_access($pdo, $input)) break;
             $trainingId = $existing['id'];
             // Clear old presences
             $pdo->prepare('DELETE FROM training_presences WHERE training_id = ?')->execute([$trainingId]);
         } else {
             $stmt = $pdo->prepare('INSERT INTO trainings (date) VALUES (?)');
-            $stmt->execute([$date]);
+            try {
+                $stmt->execute([$date]);
+            } catch (PDOException $e) {
+                // A simultaneous public submission must never become an update.
+                http_response_code($e->getCode() === '23000' ? 409 : 500);
+                echo json_encode(['error' => 'Création impossible. Actualise les séances ; si cette date existe déjà, seul le coach peut la modifier.']);
+                break;
+            }
             $trainingId = $pdo->lastInsertId();
         }
 
@@ -121,6 +143,7 @@ switch ($action) {
         break;
 
     case 'delete_training':
+        if (!require_coach_access($pdo, $input)) break;
         $id = (int)($input['id'] ?? 0);
         $stmt = $pdo->prepare('DELETE FROM trainings WHERE id = ?');
         $stmt->execute([$id]);

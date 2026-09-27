@@ -86,8 +86,18 @@ export function demoResponse(data, action, input) {
     return { ok: input.password === "demo" };
   if (action === "save_training") {
     let t = data.trainings.find((t) => t.date === input.date);
+    if (t && input.password !== "demo")
+      return {
+        error:
+          "Seul le coach peut modifier ou supprimer des présences enregistrées.",
+      };
     if (t) t.presentIds = input.presentIds;
-    else data.trainings.push({ ...input, id: Date.now() });
+    else
+      data.trainings.push({
+        date: input.date,
+        presentIds: input.presentIds,
+        id: Date.now(),
+      });
     return { ok: true };
   }
   if (action === "update_player_details") {
@@ -109,6 +119,11 @@ export function demoResponse(data, action, input) {
     delete_training: "trainings",
   };
   if (mapping[action]) {
+    if (
+      ["delete_training", "delete_player"].includes(action) &&
+      input.password !== "demo"
+    )
+      return { error: "Accès coach requis." };
     const key = mapping[action];
     if (action.startsWith("delete"))
       data[key] = data[key].filter((p) => p.id !== input.id);

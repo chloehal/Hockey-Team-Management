@@ -9,6 +9,7 @@ import {
   Confirm,
   Button,
   dateLabel,
+  Checklist,
 } from "../components/shared";
 import { ChevronDown } from "lucide-react";
 import { evaluationSummary } from "../lib/evaluations";
@@ -22,6 +23,7 @@ function PlayerEditor({
   evaluation,
   saveEvaluation,
   evaluationsReady,
+  password,
 }) {
   const [positions, setPositions] = useState([
     player.position_1 || "",
@@ -83,10 +85,63 @@ function PlayerEditor({
           <Confirm
             title={`Supprimer ${player.name} ?`}
             disabled={team.busy || team.offline}
-            onConfirm={() => team.mutate("delete_player", { id: player.id })}
+            onConfirm={() =>
+              team.mutate("delete_player", { id: player.id, password })
+            }
           />
         </div>
       </details>
+    </Card>
+  );
+}
+function TrainingEditor({ training, team, password }) {
+  const [editing, setEditing] = useState(false);
+  const [selected, setSelected] = useState([]);
+  return (
+    <Card>
+      <div className="list-row">
+        <div>
+          <strong>{dateLabel(training.date)}</strong>
+          <p className="muted">{training.presentIds.length} présentes</p>
+        </div>
+        <Button
+          variant="outline"
+          disabled={team.busy || team.offline}
+          onClick={() => {
+            setSelected(training.presentIds.map(String));
+            setEditing(!editing);
+          }}
+        >
+          {editing ? "Annuler" : "Modifier les présences"}
+        </Button>
+        <Confirm
+          title="Supprimer cette séance et ses présences ?"
+          disabled={team.busy || team.offline}
+          onConfirm={() =>
+            team.mutate("delete_training", { id: training.id, password })
+          }
+        />
+      </div>
+      {editing && (
+        <SaveForm
+          label="Enregistrer les présences"
+          disabled={team.busy || team.offline}
+          onSave={async () => {
+            await team.mutate("save_training", {
+              date: training.date,
+              presentIds: selected,
+              password,
+            });
+            setEditing(false);
+          }}
+        >
+          <Checklist
+            players={team.data.players}
+            selected={selected}
+            setSelected={setSelected}
+          />
+        </SaveForm>
+      )}
     </Card>
   );
 }
@@ -212,6 +267,7 @@ export default function Coach({ team, draft, setDraft }) {
               key={p.id}
               player={p}
               team={team}
+              password={password}
               evaluationsReady={evaluations !== null}
               evaluation={evaluations?.[p.id]}
               saveEvaluation={async (scores) => {
@@ -229,17 +285,12 @@ export default function Coach({ team, draft, setDraft }) {
       ) : tab === "trainings" ? (
         <Section title="Entraînements enregistrés">
           {team.data.trainings.map((t) => (
-            <div className="list-row" key={t.id}>
-              <div>
-                <strong>{dateLabel(t.date)}</strong>
-                <p className="muted">{t.presentIds.length} présentes</p>
-              </div>
-              <Confirm
-                title="Supprimer cette séance et ses présences ?"
-                disabled={team.busy || team.offline}
-                onConfirm={() => team.mutate("delete_training", { id: t.id })}
-              />
-            </div>
+            <TrainingEditor
+              key={t.id}
+              training={t}
+              team={team}
+              password={password}
+            />
           ))}
         </Section>
       ) : (
