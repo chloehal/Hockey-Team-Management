@@ -28,7 +28,7 @@ export const POS_GROUPS = {
 };
 export const GROUP_LABELS = {
   gardienne: "Gardienne",
-  defense: "Defense",
+  defense: "Défense",
   milieu: "Milieu",
   attaque: "Attaque",
 };
@@ -57,7 +57,21 @@ function isGoalkeeper(p) {
   return p.position_1 === "gardienne";
 }
 
-export function selectMatch(input, trainings, chosenGoalieId, evaluations) {
+export function selectMatch(
+  input,
+  trainings,
+  chosenGoalieId,
+  evaluations,
+  formation,
+) {
+  if (formation)
+    return selectFormation(
+      input,
+      trainings,
+      chosenGoalieId,
+      evaluations,
+      formation,
+    );
   const scored = input.map((p) => ({ ...p }));
   const maxT3 = Math.min(3, trainings.length),
     maxT5 = Math.min(5, trainings.length);
@@ -408,4 +422,251 @@ export function scorePlayers(players, trainings) {
       .slice(-5)
       .filter((t) => t.presentIds.map(String).includes(String(p.id))).length,
   }));
+}
+
+export const DEFAULT_FORMATION = {
+  field: { gardienne: 1, defense: 4, milieu: 3, attaque: 3 },
+  bench: { gardienne: 0, defense: 2, milieu: 2, attaque: 1 },
+};
+export function formationTotal(formation, zone) {
+  return Object.values(formation[zone] || {}).reduce(
+    (sum, count) => sum + Number(count),
+    0,
+  );
+}
+export function validateFormation(formation) {
+  for (const [zone, limit] of [
+    ["field", 11],
+    ["bench", 5],
+  ]) {
+    for (const [pos, count] of Object.entries(formation[zone] || {})) {
+      if (!(pos in GROUP_LABELS) || !Number.isInteger(count) || count < 0)
+        return "Renseigne un nombre entier positif ou nul pour chaque poste.";
+    }
+    if (formationTotal(formation, zone) > limit)
+      return zone === "field"
+        ? "Maximum 11 joueuses sur le terrain."
+        : "Maximum 5 joueuses sur le banc.";
+  }
+  if (formation.field?.gardienne !== 1)
+    return "Prévois une gardienne sur le terrain.";
+  return "";
+}
+const positionsOf = (p) =>
+  [p._originalPos || p.position_1, p.position_2, p.position_3].map(
+    (pos) => POS_GROUPS[pos] || pos,
+  );
+const preciseRolesOf = (player, group) =>
+  [
+    ...new Set([
+      player._originalPos || player.position_1,
+      player.position_2,
+      player.position_3,
+    ]),
+  ].filter((role) => POS_GROUPS[role] === group);
+
+// Composition is a tie-breaker after attendance and preferred position group.
+// Prefer an underrepresented specialty; scarce specialists go first when
+// several seats remain. Do not invent a specialty for an out-of-position move.
+function roleChoices(players, selected, zone, group, seats) {
+  const roles = [...new Set(players.flatMap((p) => preciseRolesOf(p, group)))];
+  const count = (role) =>
+    selected.filter((p) => p._zone === zone && p._role === role).length;
+  const availability = (role) =>
+    players.filter((p) => preciseRolesOf(p, group).includes(role)).length;
+  const compare = (a, b) =>
+    count(a) - count(b) || (seats > 1 ? availability(a) - availability(b) : 0);
+  roles.sort(compare);
+  return roles.filter((role) => compare(role, roles[0]) === 0);
+}
+
+export function matchVacancies(result) {
+  return ["field", "bench"].flatMap((zone) =>
+    Object.entries(result.formation[zone] || {}).flatMap(
+      ([position, quota]) => {
+        const count =
+          quota -
+          result.selected.filter(
+            (p) => p._zone === zone && p._fieldPos === position,
+          ).length;
+        return count > 0 ? [{ zone, position, count }] : [];
+      },
+    ),
+  );
+}
+export function canAssignPlayer(result, id, zone, position) {
+  if (zone === "excluded") return true;
+  if (!["field", "bench"].includes(zone)) return false;
+  const others = result.selected.filter((p) => String(p.id) !== String(id));
+  return (
+    others.filter((p) => p._zone === zone).length <
+      (zone === "field" ? 11 : 5) &&
+    others.filter((p) => p._zone === zone && p._fieldPos === position).length <
+      (result.formation[zone]?.[position] || 0)
+  );
+}
+export function moveMatchPlayer(result, id, zone, position) {
+  const player = [
+    ...result.selected,
+    ...result.deliberation,
+    ...result.excluded,
+  ].find((p) => String(p.id) === String(id));
+  if (!player) throw new Error("Joueuse introuvable.");
+  if (!canAssignPlayer(result, id, zone, position))
+    throw new Error(
+      "Ce poste est complet. Libère une place ou modifie la répartition.",
+    );
+  const next = { ...result };
+  for (const key of ["selected", "deliberation", "excluded"])
+    next[key] = result[key].filter((p) => String(p.id) !== String(id));
+  const moved = {
+    ...player,
+    _zone: zone,
+    _fieldPos: position,
+    _role: preciseRolesOf(player, position)[0] || null,
+    _reason: "Affectation ajustée manuellement.",
+  };
+  next[zone === "excluded" ? "excluded" : "selected"].push(moved);
+  next.vacancies = matchVacancies(next);
+  return next;
+}
+
+function selectFormation(input, trainings, goalieId, evaluations, formation) {
+  const error = validateFormation(formation);
+  if (error) throw new Error(error);
+  const chosen = input.find((p) => String(p.id) === String(goalieId));
+  if (!chosen)
+    throw new Error("Choisis une gardienne parmi les joueuses disponibles.");
+  const selected = [
+    {
+      ...chosen,
+      _fieldPos: "gardienne",
+      _role: "gardienne",
+      _zone: "field",
+      _reason: "Gardienne choisie pour cette rencontre.",
+    },
+  ];
+  const assigned = new Set([String(chosen.id)]);
+  const undecided = new Map();
+  const remaining = Object.keys(GROUP_LABELS).filter(
+    (pos) =>
+      (formation.field[pos] || 0) +
+        (formation.bench[pos] || 0) -
+        (pos === "gardienne" ? 1 : 0) >
+      0,
+  );
+  const candidatesFor = (pos) =>
+    input.filter(
+      (p) => !assigned.has(String(p.id)) && positionsOf(p).includes(pos),
+    );
+  while (remaining.length) {
+    // Fill the positions with the fewest compatible candidates first, so a
+    // versatile player can cover a scarce position instead of blocking a specialist.
+    remaining.sort((a, b) => candidatesFor(a).length - candidatesFor(b).length);
+    const pos = remaining.shift();
+    const fieldCount =
+      (formation.field[pos] || 0) - (pos === "gardienne" ? 1 : 0);
+    const capacity = fieldCount + (formation.bench[pos] || 0);
+    const candidates = candidatesFor(pos);
+    const baseCompare = (a, b) =>
+      b.pres3 - a.pres3 ||
+      b.pres5 - a.pres5 ||
+      positionsOf(a).indexOf(pos) - positionsOf(b).indexOf(pos);
+    candidates.sort(baseCompare);
+    let used = 0;
+    for (let i = 0; i < candidates.length && used < capacity;) {
+      let j = i + 1;
+      while (
+        j < candidates.length &&
+        baseCompare(candidates[i], candidates[j]) === 0
+      )
+        j++;
+      const tied = candidates.slice(i, j);
+      const averages = evaluations
+        ? tied.map((p) => evaluationSummary(evaluations[p.id] || {}).average)
+        : [];
+      const ranked = tied
+        .map((p, index) => ({
+          p,
+          merit: evaluations
+            ? averages.every((v) => v !== null)
+              ? averages[index]
+              : 0
+            : 3 - (p.level || 2),
+        }))
+        .sort((a, b) => b.merit - a.merit);
+      const pool = [...ranked];
+      while (pool.length && used < capacity) {
+        const zone = used < fieldCount ? "field" : "bench";
+        const seats = capacity - used;
+        const preferredRoles = roleChoices(
+          pool.map((entry) => entry.p),
+          selected,
+          zone,
+          pos,
+          seats,
+        );
+        const compatible = pool.filter(
+          ({ p }) =>
+            !preferredRoles.length ||
+            preciseRolesOf(p, pos).some((role) =>
+              preferredRoles.includes(role),
+            ),
+        );
+        const bestMerit = Math.max(...compatible.map((entry) => entry.merit));
+        const group = compatible
+          .filter((entry) => entry.merit === bestMerit)
+          .map((entry) => entry.p);
+        if (group.length > seats) {
+          for (const p of group)
+            undecided.set(String(p.id), {
+              ...p,
+              _reason: `Égalité pour ${seats} place(s) au poste ${GROUP_LABELS[pos]}, après prise en compte des rôles précis. Choix manuel nécessaire.`,
+            });
+          used = capacity;
+        } else {
+          const p = group[0];
+          const role =
+            preciseRolesOf(p, pos).find((role) =>
+              preferredRoles.includes(role),
+            ) ||
+            preciseRolesOf(p, pos)[0] ||
+            null;
+          selected.push({
+            ...p,
+            _fieldPos: pos,
+            _role: role,
+            _zone: zone,
+            _reason: `Poste compatible · ${p.pres3}/${Math.min(3, trainings.length)} puis ${p.pres5}/${Math.min(5, trainings.length)} présences. À égalité : préférence de poste, équilibre des rôles précis, puis ${evaluations ? "évaluation complète" : "niveau"}.`,
+          });
+          assigned.add(String(p.id));
+          pool.splice(
+            pool.findIndex((entry) => String(entry.p.id) === String(p.id)),
+            1,
+          );
+          used++;
+        }
+      }
+      i = j;
+    }
+  }
+  const result = {
+    selected,
+    deliberation: [...undecided.values()].filter(
+      (p) => !assigned.has(String(p.id)),
+    ),
+    excluded: input
+      .filter(
+        (p) => !assigned.has(String(p.id)) && !undecided.has(String(p.id)),
+      )
+      .map((p) => ({
+        ...p,
+        _reason: "Places compatibles attribuées ou réservées à un départage.",
+      })),
+    maxT3: Math.min(3, trainings.length),
+    maxT5: Math.min(5, trainings.length),
+    formation: structuredClone(formation),
+  };
+  result.vacancies = matchVacancies(result);
+  return result;
 }

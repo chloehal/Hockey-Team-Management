@@ -1,25 +1,12 @@
-import { useEffect, useState } from "react";
 import {
   Heading,
   Section,
-  Field,
-  SaveForm,
-  Checklist,
+  Button,
   Empty,
   dateLabel,
-  today,
 } from "../components/shared";
-export default function Attendance({ team }) {
-  const { data, mutate, busy, offline } = team;
-  const [date, setDate] = useState(today),
-    [selected, setSelected] = useState([]);
-  useEffect(() => {
-    setSelected(
-      (data.trainings.find((t) => t.date === date)?.presentIds || []).map(
-        String,
-      ),
-    );
-  }, [date, data.trainings]);
+export default function Attendance({ team, onTakeAttendance }) {
+  const { data } = team;
   return (
     <>
       <Heading
@@ -28,29 +15,9 @@ export default function Attendance({ team }) {
       />
       <Section
         title="Enregistrer les présences"
-        description={
-          data.trainings.some((t) => t.date === date)
-            ? "Une séance existe à cette date. Enregistrer mettra ses présences à jour."
-            : "Sélectionne la date et les joueuses présentes."
-        }
+        description="Le pointage rapide est accessible sur toutes les pages. Ta saisie est conservée pendant le chargement."
       >
-        <SaveForm
-          disabled={busy || offline}
-          onSave={() => mutate("save_training", { date, presentIds: selected })}
-        >
-          <Field
-            label="Date de l’entraînement"
-            type="date"
-            required
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-          <Checklist
-            players={data.players}
-            selected={selected}
-            setSelected={setSelected}
-          />
-        </SaveForm>
+        <Button onClick={onTakeAttendance}>Ouvrir le pointage</Button>
       </Section>
       <Section
         title="Historique des présences"

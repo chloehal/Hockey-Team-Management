@@ -745,3 +745,212 @@
     border-top: 1px solid var(--border);
   }
 }
+
+.formation-dialog {
+  max-height: 90dvh;
+  overflow-y: auto;
+}
+.formation-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.formation-totals strong {
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--muted);
+}
+.formation-totals [data-invalid="true"] {
+  color: #b91c1c;
+  border-color: #b91c1c;
+}
+.formation-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px 72px;
+  align-items: center;
+  gap: 10px;
+}
+.formation-grid > strong {
+  text-align: center;
+}
+.formation-row {
+  display: contents;
+}
+.formation-row input {
+  text-align: center;
+}
+.formation-row > span {
+  font-size: 14px;
+}
+.lineup-heading {
+  font-weight: 600;
+  margin: 16px 0 12px;
+}
+.match-bench {
+  padding: 0 16px 16px;
+  margin: 16px 0;
+  border: 1px solid var(--border);
+  background: var(--muted);
+}
+.match-bench .pitch-player {
+  border: 1px solid var(--border);
+}
+.match-vacancies {
+  padding: 12px;
+  border: 1px solid var(--border);
+  font-size: 14px;
+}
+.match-candidate select {
+  width: min(100%, 250px);
+}
+@media (max-width: 480px) {
+  .formation-grid {
+    grid-template-columns: minmax(0, 1fr) 60px 60px;
+    gap: 8px;
+  }
+  .formation-dialog {
+    padding: 18px;
+  }
+  .match-candidate {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .match-candidate select {
+    width: 100%;
+  }
+}
+
+.quick-attendance-trigger {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  z-index: 35;
+  box-shadow: 0 4px 20px #0002;
+  min-height: 44px;
+}
+.attendance-dialog {
+  max-height: 90dvh;
+  overflow-y: auto;
+}
+.attendance-feedback {
+  display: grid;
+  justify-items: center;
+  text-align: center;
+  gap: 18px;
+  padding: 24px 4px;
+}
+.attendance-feedback p {
+  font-size: 14px;
+  color: var(--muted-foreground);
+}
+.attendance-spinner {
+  animation: attendance-spin 1s linear infinite;
+}
+.attendance-success {
+  color: #47772a;
+}
+.attendance-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  position: sticky;
+  bottom: -24px;
+  padding: 16px 0;
+  background: var(--background);
+  border-top: 1px solid var(--border);
+}
+@keyframes attendance-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .attendance-spinner {
+    animation: none;
+  }
+}
+@media (max-width: 767px) {
+  .quick-attendance-trigger {
+    bottom: calc(92px + env(safe-area-inset-bottom));
+    right: 16px;
+  }
+  .attendance-dialog {
+    padding: 18px;
+  }
+  .attendance-actions {
+    bottom: -18px;
+  }
+}
+
+.deliberation-warning {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 22px;
+  margin-bottom: 24px;
+  border: 2px solid #b45309;
+  border-left-width: 6px;
+  background: #fffbeb;
+  color: #78350f;
+  scroll-margin-top: 24px;
+}
+.deliberation-warning > svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+.deliberation-warning-content {
+  min-width: 0;
+  display: grid;
+  gap: 10px;
+}
+.deliberation-warning h2 {
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+.deliberation-count {
+  font-size: 17px;
+  font-weight: 700;
+}
+.deliberation-warning p {
+  overflow-wrap: anywhere;
+}
+.deliberation-warning .deliberation-names {
+  font-size: 13px;
+}
+.deliberation-warning button {
+  width: fit-content;
+  margin-top: 4px;
+}
+.match-candidate-section {
+  margin-bottom: 24px;
+  scroll-margin-top: 24px;
+}
+.deliberation-warning:focus-visible,
+.match-candidate-section:focus-visible {
+  outline: 3px solid #b45309;
+  outline-offset: 4px;
+}
+@media (max-width: 480px) {
+  .deliberation-warning {
+    padding: 16px;
+    gap: 10px;
+  }
+  .deliberation-warning h2 {
+    font-size: 19px;
+  }
+  .deliberation-warning button {
+    white-space: normal;
+    height: auto;
+    min-height: 40px;
+  }
+}
+@media print {
+  .deliberation-warning {
+    break-inside: avoid;
+    print-color-adjust: exact;
+  }
+}

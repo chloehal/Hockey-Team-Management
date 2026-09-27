@@ -1,4 +1,4 @@
-import { POS_FULL_LABELS } from "./selection";
+import { GROUP_LABELS, POS_GROUPS, POS_FULL_LABELS } from "./selection";
 export async function exportMatch(result) {
   const canvas = document.createElement("canvas");
   canvas.width = 1200;
@@ -11,7 +11,10 @@ export async function exportMatch(result) {
   ctx.fillText("LES PANTHÈRES · Feuille de match", 40, 60);
   ctx.font = "20px sans-serif";
   ctx.fillText(new Date().toLocaleDateString("fr-BE"), 40, 100);
-  result.selected.forEach((p, i) => {
+  const rows = [...result.selected].sort(
+    (a, b) => (a._zone === "bench") - (b._zone === "bench"),
+  );
+  rows.forEach((p, i) => {
     const y = 150 + i * 60;
     ctx.fillStyle = i % 2 ? "#fafafa" : "#f4f4f5";
     ctx.fillRect(30, y - 28, 1140, 58);
@@ -21,7 +24,7 @@ export async function exportMatch(result) {
     ctx.fillText(p.name, 120, y + 8, 480);
     ctx.font = "17px sans-serif";
     ctx.fillText(
-      POS_FULL_LABELS[p._fieldPos || p.position_1] || "—",
+      `${p._zone === "bench" ? "Banc" : "Terrain"} · ${POS_FULL_LABELS[p._role] || GROUP_LABELS[p._fieldPos || POS_GROUPS[p.position_1]] || "—"}`,
       640,
       y + 8,
     );

@@ -10,7 +10,7 @@ Interface React pour les joueuses et les coachs : présences, feuille de match, 
 - `src/lib/api.js` : contrat HTTP avec l’API PHP existante.
 - `src/lib/selection.js` : règles de sélection pures, partagées entre les deux espaces.
 - `src/lib/content.js` : calendrier des matchs et URL Google Calendar existants.
-- `api.php`, `player-evaluations.php` : API PHP, étendue pour les évaluations coach. `setup.sql` : schéma historique inchangé.
+- `api.php`, `coach-auth.php`, `player-evaluations.php` : API PHP, étendue pour les évaluations coach. `setup.sql` : schéma historique inchangé.
 
 Le frontend est écrit en JavaScript/JSX avec React et Vite. PHP reste responsable des données. Aucune migration de base n’est nécessaire pour cette refonte.
 
@@ -41,6 +41,7 @@ Mot de passe coach de démonstration : `demo`. Les données restent en mémoire 
 
 ```sh
 npm test
+php tests/attendance-access.php
 npx playwright install chromium
 npm run test:e2e
 npm run build
@@ -50,7 +51,7 @@ Les tests navigateur interceptent l’API ; ils n’écrivent dans aucune base r
 
 ## Déploiement PHP / Hostinger
 
-`npm run build` produit `dist/` avec `index.html`, `coach.html`, les assets, `api.php`, `player-evaluations.php` et la règle `.htaccess` conservant `/coach`. Les routes du frontend utilisent un hash et ne nécessitent pas de réécriture SPA.
+`npm run build` produit `dist/` avec `index.html`, `coach.html`, les assets, `api.php`, `coach-auth.php`, `player-evaluations.php` et la règle `.htaccess` conservant `/coach`. Les routes du frontend utilisent un hash et ne nécessitent pas de réécriture SPA.
 
 `config.php` est volontairement exclu du build et de Git : conserver le fichier privé existant **à côté de `api.php` sur l’hébergement PHP**. Déployer sans effacer ce fichier. Un hébergement statique ou un serveur Node seul ne suffit pas à exécuter l’API PHP. Si Hostinger remplace intégralement le répertoire à chaque publication, configurer explicitement la conservation/injection privée de ce fichier avant de mettre la refonte en production.
 
@@ -67,7 +68,9 @@ Le nouveau service worker retire seulement les anciens caches `pantheres-*`, afi
 - Deux arbitres maximum par date, copie des dates à couvrir.
 - Les dates de matchs restent configurées dans le code, comme auparavant.
 
-La protection de l’espace coach conserve le comportement de l’API existante ; cette refonte frontend ne constitue pas une refonte de l’authentification serveur.
+La création d’une séance reste publique. Modifier une séance existante, supprimer une séance ou supprimer une joueuse (qui efface ses présences associées) nécessite le mot de passe coach côté PHP. La vérification échoue si le mot de passe enregistré est absent ou indisponible. Les corrections sont accessibles dans l’espace coach, rubrique Séances. Le mot de passe reste en mémoire dans cet espace et n’est pas stocké dans le cache navigateur.
+
+Les quotas restent par grande position, avec au maximum 11 titulaires et 5 remplaçantes. Après les présences sur 3 puis 5 séances et la préférence de position, la sélection privilégie les spécialités sous-représentées (centrale/latérale, centre/aile), puis le niveau ou l’évaluation coach. Les rôles précis retenus sont affichés et exportés. Ce sont des préférences de composition, pas des quotas supplémentaires : les présences restent prioritaires et les égalités restantes demandent un choix manuel.
 
 
 ### Évaluations coach

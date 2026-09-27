@@ -7,6 +7,23 @@ import Attendance from "./pages/Attendance";
 import Match from "./pages/Match";
 import Coach from "./pages/Coach";
 import Rules from "./pages/Rules";
+import QuickAttendance from "./components/QuickAttendance";
+import { validateFormation } from "./lib/selection";
+function initialMatchDraft(key) {
+  let formation;
+  try {
+    const saved = JSON.parse(sessionStorage.getItem(key));
+    if (saved && saved.field && saved.bench && !validateFormation(saved))
+      formation = saved;
+  } catch {}
+  return { available: [], result: null, ...(formation ? { formation } : {}) };
+}
+function rememberFormation(key, formation) {
+  if (!formation || validateFormation(formation)) return;
+  try {
+    sessionStorage.setItem(key, JSON.stringify(formation));
+  } catch {}
+}
 const routes = [
   ["team", "Équipe", House],
   ["attendance", "Présences", ClipboardCheck],
@@ -19,8 +36,19 @@ const routeNow = () =>
 export default function App() {
   const team = useTeam(),
     [route, setRoute] = useState(routeNow),
-    [matchDraft, setMatchDraft] = useState({ available: [], result: null }),
-    [coachDraft, setCoachDraft] = useState({ available: [], result: null });
+    [attendanceOpen, setAttendanceOpen] = useState(false),
+    [matchDraft, setMatchDraft] = useState(() =>
+      initialMatchDraft("pantheres-match-formation-v1"),
+    ),
+    [coachDraft, setCoachDraft] = useState(() =>
+      initialMatchDraft("pantheres-coach-formation-v1"),
+    );
+  useEffect(() => {
+    rememberFormation("pantheres-match-formation-v1", matchDraft.formation);
+  }, [matchDraft.formation]);
+  useEffect(() => {
+    rememberFormation("pantheres-coach-formation-v1", coachDraft.formation);
+  }, [coachDraft.formation]);
   useEffect(() => {
     const change = () => {
       setRoute(routeNow());
@@ -86,8 +114,8 @@ export default function App() {
             {team.error}
             {team.offline && (
               <p>
-                Les données affichées peuvent être anciennes. Les modifications
-                sont désactivées.
+                Les données affichées peuvent être anciennes. Le brouillon de
+                présences reste disponible via le bouton rapide.
               </p>
             )}
             <Button variant="outline" onClick={team.refresh}>
@@ -95,10 +123,16 @@ export default function App() {
             </Button>
           </div>
         )}
-        {team.loading ? (
+        {team.loading && !team.hasCachedData ? (
           <p role="status">Chargement de l’équipe…</p>
         ) : route === "attendance" ? (
-          <Attendance team={team} />
+          <Attendance
+            team={team}
+            onTakeAttendance={() => {
+              team.resetAttendanceStatus();
+              setAttendanceOpen(true);
+            }}
+          />
         ) : route === "match" ? (
           <Match team={team} draft={matchDraft} setDraft={setMatchDraft} />
         ) : route === "coach" ? (
@@ -117,6 +151,11 @@ export default function App() {
           <Team team={team} />
         )}
       </main>
+      <QuickAttendance
+        team={team}
+        open={attendanceOpen}
+        onOpenChange={setAttendanceOpen}
+      />
       <nav className="mobile-nav" aria-label="Navigation mobile">
         {routes.map(([key, label, Icon]) => (
           <a
