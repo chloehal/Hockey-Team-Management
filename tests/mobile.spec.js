@@ -301,6 +301,11 @@ test("les égalités sont annoncées et le raccourci mène aux choix à faire", 
     .click();
   await page.getByLabel("Terrain · Défense", { exact: true }).fill("1");
   await page.getByLabel("Banc · Défense", { exact: true }).fill("0");
+  // Only two roster places: otherwise both defenders must now be retained,
+  // even if one needs to cover another position.
+  for (const group of ["Milieu", "Attaque"])
+    for (const zone of ["Terrain", "Banc"])
+      await page.getByLabel(`${zone} · ${group}`, { exact: true }).fill("0");
   await page
     .getByRole("button", { name: "Valider la répartition", exact: true })
     .click();
@@ -325,6 +330,67 @@ test("les égalités sont annoncées et le raccourci mène aux choix à faire", 
     .getByRole("combobox", { name: "Affectation de Défense B", exact: true })
     .selectOption("excluded");
   await expect(warning).toHaveCount(0);
+});
+
+test("Sarah et Fanny sont retenues avant Rosa et Elise malgré les quotas par poste", async ({
+  page,
+}) => {
+  await page.route("**/api.php?action=get_players", (route) =>
+    route.fulfill({
+      json: [
+        { id: 1, name: "Gardienne test", position_1: "gardienne", level: 2 },
+        {
+          id: 2,
+          name: "Attaquante test",
+          position_1: "attaquante_centre",
+          level: 2,
+        },
+        { id: 3, name: "Sarah", position_1: "attaquante_aile", level: 2 },
+        { id: 4, name: "Fanny", position_1: "attaquante_centre", level: 2 },
+        { id: 5, name: "Elise", position_1: "defense_laterale", level: 2 },
+        { id: 6, name: "Rosa", position_1: "milieu_aile", level: 2 },
+      ],
+    }),
+  );
+  await page.route("**/api.php?action=get_trainings", (route) =>
+    route.fulfill({
+      json: [
+        { id: 1, date: "2026-10-02", presentIds: [2, 3, 4, 5, 6] },
+        { id: 2, date: "2026-10-09", presentIds: [2, 3, 4] },
+        { id: 3, date: "2026-10-16", presentIds: [2] },
+      ],
+    }),
+  );
+  await page.goto("/#/match");
+  await page.getByRole("button", { name: "Toutes", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Générer la sélection", exact: true })
+    .click();
+  for (const [label, count] of [
+    ["Terrain · Défense", "1"],
+    ["Terrain · Milieu", "0"],
+    ["Terrain · Attaque", "1"],
+    ["Banc · Défense", "0"],
+    ["Banc · Milieu", "1"],
+    ["Banc · Attaque", "0"],
+  ])
+    await page.getByLabel(label, { exact: true }).fill(count);
+  await page
+    .getByRole("button", { name: "Valider la répartition", exact: true })
+    .click();
+  await expect(
+    page.locator(".pitch-player").filter({ hasText: "Sarah" }),
+  ).toContainText("Hors poste habituel");
+  await expect(
+    page.locator(".pitch-player").filter({ hasText: "Fanny" }),
+  ).toContainText("Hors poste habituel");
+  await expect(page.locator(".pitch-player")).toHaveCount(4);
+  const excluded = page.getByRole("region", {
+    name: "Joueuses non retenues",
+    exact: true,
+  });
+  await expect(excluded).toContainText("Rosa");
+  await expect(excluded).toContainText("Elise");
 });
 
 test("le cas Emma et Mia reste reproductible après actualisation", async ({
@@ -398,7 +464,11 @@ test("seul le coach peut corriger une séance et son mot de passe ne reste pas e
       exact: true,
     }),
   ).toBeDisabled();
-  await page.getByRole("dialog").locator("form").getByRole("button", { name: "Fermer", exact: true }).click();
+  await page
+    .getByRole("dialog")
+    .locator("form")
+    .getByRole("button", { name: "Fermer", exact: true })
+    .click();
   await page.goto("/coach.html");
   await page.getByLabel("Mot de passe coach", { exact: true }).fill("demo");
   await page.getByRole("button", { name: "Ouvrir l’espace coach" }).click();

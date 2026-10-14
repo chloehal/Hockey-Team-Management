@@ -278,7 +278,7 @@ export default function Match({
     <>
       <Heading
         title={coach ? "Préparer la sélection." : "La feuille de match."}
-        description="Choisis les disponibles, puis le nombre de joueuses par poste : jusqu’à 11 sur le terrain et 5 sur le banc."
+        description="Les présences sur 3 puis 5 entraînements sont prioritaires dans toute l’équipe. Les postes départagent les égalités, puis répartissent les joueuses retenues."
       />
       <Section
         title="Qui est disponible ?"
@@ -310,7 +310,9 @@ export default function Match({
             <DialogTitle>Répartition de la feuille</DialogTitle>
             <DialogDescription>
               Indique combien de joueuses tu veux à chaque poste, sur le terrain
-              et sur le banc. La gardienne compte dans les 11.
+              et sur le banc. La gardienne compte dans les 11. Les présences
+              restent prioritaires : la répartition peut nécessiter une
+              affectation hors poste habituel.
             </DialogDescription>
           </DialogHeader>
           <form className="stack" onSubmit={generate}>

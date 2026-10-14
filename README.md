@@ -70,7 +70,7 @@ Le nouveau service worker retire seulement les anciens caches `pantheres-*`, afi
 
 La création d’une séance reste publique. Modifier une séance existante, supprimer une séance ou supprimer une joueuse (qui efface ses présences associées) nécessite le mot de passe coach côté PHP. La vérification échoue si le mot de passe enregistré est absent ou indisponible. Les corrections sont accessibles dans l’espace coach, rubrique Séances. Le mot de passe reste en mémoire dans cet espace et n’est pas stocké dans le cache navigateur.
 
-Les quotas restent par grande position, avec au maximum 11 titulaires et 5 remplaçantes. Après les présences sur 3 puis 5 séances et la préférence de position, la sélection privilégie les spécialités sous-représentées (centrale/latérale, centre/aile), puis le niveau ou l’évaluation coach. Les rôles précis retenus sont affichés et exportés. Ce sont des préférences de composition, pas des quotas supplémentaires : les présences restent prioritaires et les égalités restantes demandent un choix manuel.
+La sélection classe d’abord toutes les disponibles par présences sur 3 puis 5 séances, avec une place réservée à la gardienne choisie. Les quotas de poste ne peuvent jamais faire passer une joueuse moins présente devant une autre. À égalité au seuil de sélection, la composition (préférence de poste, spécialités sous-représentées), puis le niveau ou l’évaluation coach départagent les candidates ; les égalités restantes demandent un choix manuel. Les joueuses retenues sont ensuite réparties dans les places demandées, avec au maximum 11 titulaires et 5 remplaçantes. Une affectation hors poste habituel est signalée et peut être ajustée manuellement. Les rôles précis retenus sont affichés et exportés.
 
 
 ### Évaluations coach
