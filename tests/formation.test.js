@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import * as selection from "../src/lib/selection.js";
+import { CRITERIA } from "../src/lib/evaluations.js";
 const p = (
   id,
   pres3,
@@ -92,7 +93,7 @@ test("les postes secondaires remplissent les places disponibles sans doublonner 
   assert.equal(result.selected.find((p) => p.id === 2)._fieldPos, "milieu");
   assert.equal(result.selected.find((p) => p.id === 3)._fieldPos, "defense");
 });
-test("aucune joueuse incompatible n’est affectée automatiquement à un poste vacant", () => {
+test("une joueuse retenue par ses présences reste sélectionnée hors poste si nécessaire", () => {
   const result = selection.selectMatch(
     [p(1, 0, 0, "gardienne"), p(2, 3, 5)],
     trainings,
@@ -100,8 +101,195 @@ test("aucune joueuse incompatible n’est affectée automatiquement à un poste 
     undefined,
     { field: { gardienne: 1, attaque: 2 }, bench: {} },
   );
-  assert.equal(result.selected.length, 1);
-  assert.equal(result.vacancies.find((v) => v.position === "attaque").count, 2);
+  assert.equal(result.selected.length, 2);
+  assert.equal(result.selected.find((p) => p.id === 2)._fieldPos, "attaque");
+  assert.equal(result.selected.find((p) => p.id === 2)._role, null);
+  assert.equal(result.vacancies.find((v) => v.position === "attaque").count, 1);
+});
+
+test("les présences sont prioritaires sur les quotas même entre postes différents", () => {
+  const players = [
+    p(1, 0, 0, "gardienne"),
+    p(2, 3, 5, "attaquante_centre"),
+    p(3, 2, 3, "attaquante_aile", { name: "Sarah" }),
+    p(4, 2, 3, "attaquante_centre", { name: "Fanny" }),
+    p(5, 1, 3, "defense_laterale", { name: "Elise" }),
+    p(6, 1, 3, "milieu_aile", { name: "Rosa" }),
+  ];
+  const config = {
+    field: { gardienne: 1, attaque: 1, defense: 1 },
+    bench: { milieu: 1 },
+  };
+  for (const input of [players, [...players].reverse()]) {
+    const before = structuredClone(input);
+    const result = selection.selectMatch(
+      input,
+      trainings,
+      1,
+      undefined,
+      config,
+    );
+    assert.deepEqual(result.selected.map((p) => p.id).sort(), [1, 2, 3, 4]);
+    assert.deepEqual(result.excluded.map((p) => p.id).sort(), [5, 6]);
+    assert.equal(result.deliberation.length, 0);
+    assert.equal(result.vacancies.length, 0);
+    assert.deepEqual(input, before);
+  }
+});
+
+test("les cinq dernières présences passent aussi avant un poste compatible et le niveau", () => {
+  const result = selection.selectMatch(
+    [
+      p(1, 0, 0, "gardienne"),
+      p(2, 2, 4, "attaquante_aile", { level: 3 }),
+      p(3, 2, 3, "defense_centrale", { level: 1 }),
+    ],
+    trainings,
+    1,
+    undefined,
+    { field: { gardienne: 1, defense: 1 }, bench: {} },
+  );
+  assert.deepEqual(
+    result.selected.map((p) => p.id),
+    [1, 2],
+  );
+  assert.deepEqual(
+    result.excluded.map((p) => p.id),
+    [3],
+  );
+});
+
+test("une égalité globale réserve les places même si une moins présente couvre un poste vacant", () => {
+  const result = selection.selectMatch(
+    [
+      p(1, 0, 0, "gardienne"),
+      p(2, 3, 5, "attaquante_centre"),
+      p(3, 3, 5, "attaquante_centre"),
+      p(4, 1, 2),
+    ],
+    trainings,
+    1,
+    undefined,
+    { field: { gardienne: 1, defense: 1 }, bench: {} },
+  );
+  assert.deepEqual(
+    result.selected.map((p) => p.id),
+    [1],
+  );
+  assert.deepEqual(result.deliberation.map((p) => p.id).sort(), [2, 3]);
+  assert.deepEqual(
+    result.excluded.map((p) => p.id),
+    [4],
+  );
+});
+
+test("les notes coach ne passent jamais devant les présences globales", () => {
+  const players = [
+    p(1, 0, 0, "gardienne"),
+    p(2, 2, 4, "attaquante_aile"),
+    p(3, 2, 3, "defense_centrale"),
+  ];
+  const evaluations = Object.fromEntries(
+    players.map((player) => [
+      player.id,
+      Object.fromEntries(
+        CRITERIA.map(([key]) => [key, player.id === 3 ? 10 : 0]),
+      ),
+    ]),
+  );
+  for (const notes of [evaluations, { 3: evaluations[3] }]) {
+    const result = selection.selectMatch(players, trainings, 1, notes, {
+      field: { gardienne: 1, defense: 1 },
+      bench: {},
+    });
+    assert.deepEqual(
+      result.selected.map((p) => p.id),
+      [1, 2],
+    );
+    assert.deepEqual(
+      result.excluded.map((p) => p.id),
+      [3],
+    );
+  }
+});
+
+test("le placement puis le niveau départagent le seuil après réservation des meilleures présences", () => {
+  const players = [
+    p(1, 0, 0, "gardienne"),
+    p(2, 3, 5, "attaquante_centre"),
+    p(3, 2, 3, "defense_centrale", { level: 1 }),
+    p(4, 2, 3, "defense_centrale", { level: 3 }),
+  ];
+  const config = { field: { gardienne: 1, defense: 2 }, bench: {} };
+  for (const input of [players, [...players].reverse()]) {
+    const result = selection.selectMatch(
+      input,
+      trainings,
+      1,
+      undefined,
+      config,
+    );
+    assert.deepEqual(result.selected.map((p) => p.id).sort(), [1, 2, 3]);
+    assert.equal(result.deliberation.length, 0);
+    assert.deepEqual(
+      result.excluded.map((p) => p.id),
+      [4],
+    );
+  }
+  const evaluations = Object.fromEntries(
+    players.map((player) => [
+      player.id,
+      Object.fromEntries(
+        CRITERIA.map(([key]) => [key, player.id === 4 ? 9 : 5]),
+      ),
+    ]),
+  );
+  const result = selection.selectMatch(
+    players,
+    trainings,
+    1,
+    evaluations,
+    config,
+  );
+  assert.deepEqual(result.selected.map((p) => p.id).sort(), [1, 2, 4]);
+  assert.equal(result.deliberation.length, 0);
+});
+
+test("à présences égales les notes hors poste exigent des évaluations complètes", () => {
+  const players = [p(1, 0, 0, "gardienne"), p(2, 2, 3), p(3, 2, 3)];
+  const evaluations = Object.fromEntries(
+    players.map((player) => [
+      player.id,
+      Object.fromEntries(
+        CRITERIA.map(([key]) => [key, player.id === 3 ? 9 : 5]),
+      ),
+    ]),
+  );
+  const config = { field: { gardienne: 1, attaque: 1 }, bench: {} };
+  const complete = selection.selectMatch(
+    players,
+    trainings,
+    1,
+    evaluations,
+    config,
+  );
+  assert.deepEqual(
+    complete.selected.map((p) => p.id),
+    [1, 3],
+  );
+  delete evaluations[2];
+  const incomplete = selection.selectMatch(
+    players,
+    trainings,
+    1,
+    evaluations,
+    config,
+  );
+  assert.deepEqual(
+    incomplete.selected.map((p) => p.id),
+    [1],
+  );
+  assert.deepEqual(incomplete.deliberation.map((p) => p.id).sort(), [2, 3]);
 });
 test("les déplacements gardent le banc dans la sélection et bloquent une place pleine", () => {
   const result = selection.selectMatch(

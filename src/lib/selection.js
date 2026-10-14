@@ -534,26 +534,180 @@ export function moveMatchPlayer(result, id, zone, position) {
 function selectFormation(input, trainings, goalieId, evaluations, formation) {
   const error = validateFormation(formation);
   if (error) throw new Error(error);
+  const goalie = input.find((p) => String(p.id) === String(goalieId));
+  if (!goalie)
+    throw new Error("Choisis une gardienne parmi les joueuses disponibles.");
+
+  // Choose the roster globally BEFORE assigning positions. A position quota
+  // must never let a less-present player bypass the attendance cutoff.
+  const compareAttendance = (a, b) => b.pres3 - a.pres3 || b.pres5 - a.pres5;
+  const candidates = input
+    .filter((p) => String(p.id) !== String(goalie.id))
+    .sort(compareAttendance);
+  const capacity =
+    formationTotal(formation, "field") + formationTotal(formation, "bench") - 1;
+  const roster = [goalie];
+  let deliberation = [];
+  if (candidates.length <= capacity) roster.push(...candidates);
+  else if (capacity > 0) {
+    const cutoff = candidates[capacity - 1];
+    roster.push(...candidates.filter((p) => compareAttendance(p, cutoff) < 0));
+    const tied = candidates.filter((p) => compareAttendance(p, cutoff) === 0);
+    let seats = capacity - (roster.length - 1);
+    if (tied.length <= seats) roster.push(...tied);
+    else {
+      // Composition and merit can only choose among this attendance tie.
+      // The higher-attendance roster is locked, even if it needs other positions.
+      const composition = composeFormation(
+        [...roster, ...tied],
+        trainings,
+        goalieId,
+        evaluations,
+        formation,
+        assignFormationRoster(
+          roster,
+          trainings,
+          goalieId,
+          evaluations,
+          formation,
+        ).selected,
+      );
+      const tiedIds = new Set(tied.map((p) => String(p.id)));
+      const groups = [composition.selected, composition.deliberation].map(
+        (group) => group.filter((p) => tiedIds.has(String(p.id))),
+      );
+      const remaining = composition.excluded.filter((p) =>
+        tiedIds.has(String(p.id)),
+      );
+      const averages = remaining.map(
+        (p) => evaluationSummary(evaluations?.[p.id] || {}).average,
+      );
+      const ranked = remaining
+        .map((p, index) => ({
+          p,
+          merit: evaluations
+            ? averages.every((average) => average !== null)
+              ? averages[index]
+              : 0
+            : 3 - (p.level || 2),
+        }))
+        .sort((a, b) => b.merit - a.merit);
+      for (let i = 0; i < ranked.length;) {
+        let j = i + 1;
+        while (j < ranked.length && ranked[j].merit === ranked[i].merit) j++;
+        groups.push(ranked.slice(i, j).map(({ p }) => p));
+        i = j;
+      }
+      for (const group of groups) {
+        if (!seats) break;
+        if (group.length <= seats) {
+          roster.push(...group);
+          seats -= group.length;
+        } else {
+          deliberation = group.map((p) => ({
+            ...p,
+            _reason: `Égalité de présences (${p.pres3}/${Math.min(3, trainings.length)}, ${p.pres5}/${Math.min(5, trainings.length)}) pour ${seats} place(s) dans la sélection. Choix manuel nécessaire après départage par composition et ${evaluations ? "évaluations" : "niveau"}.`,
+          }));
+          seats = 0;
+        }
+      }
+    }
+  }
+
+  const result = assignFormationRoster(
+    roster,
+    trainings,
+    goalieId,
+    evaluations,
+    formation,
+  );
+  const rosterIds = new Set(roster.map((p) => String(p.id)));
+  const undecidedIds = new Set(deliberation.map((p) => String(p.id)));
+  result.deliberation = deliberation;
+  result.excluded = candidates
+    .filter(
+      (p) => !rosterIds.has(String(p.id)) && !undecidedIds.has(String(p.id)),
+    )
+    .map((p) => ({
+      ...p,
+      _reason:
+        "Non retenue après classement global par présences sur 3 puis 5 entraînements ; à égalité, départage par composition puis niveau ou évaluations.",
+    }));
+  result.vacancies = matchVacancies(result);
+  return result;
+}
+
+// Place every member of an already chosen roster, including out-of-position
+// assignments. This also reserves higher-attendance seats before tie-breaking.
+function assignFormationRoster(
+  roster,
+  trainings,
+  goalieId,
+  evaluations,
+  formation,
+) {
+  const result = composeFormation(
+    roster,
+    trainings,
+    goalieId,
+    evaluations,
+    formation,
+  );
+  const placed = new Set(result.selected.map((p) => String(p.id)));
+  for (const p of roster) {
+    if (placed.has(String(p.id))) continue;
+    const vacancies = matchVacancies(result);
+    const compatible = vacancies.filter((v) =>
+      positionsOf(p).includes(v.position),
+    );
+    compatible.sort(
+      (a, b) =>
+        positionsOf(p).indexOf(a.position) - positionsOf(p).indexOf(b.position),
+    );
+    const slot = compatible[0] || vacancies[0];
+    result.selected.push({
+      ...p,
+      _zone: slot.zone,
+      _fieldPos: slot.position,
+      _role: preciseRolesOf(p, slot.position)[0] || null,
+      _reason:
+        "Retenue en priorité pour ses présences ; répartition à ajuster si nécessaire.",
+    });
+  }
+  return result;
+}
+
+function composeFormation(
+  input,
+  trainings,
+  goalieId,
+  evaluations,
+  formation,
+  initialSelected,
+) {
+  const error = validateFormation(formation);
+  if (error) throw new Error(error);
   const chosen = input.find((p) => String(p.id) === String(goalieId));
   if (!chosen)
     throw new Error("Choisis une gardienne parmi les joueuses disponibles.");
-  const selected = [
-    {
-      ...chosen,
-      _fieldPos: "gardienne",
-      _role: "gardienne",
-      _zone: "field",
-      _reason: "Gardienne choisie pour cette rencontre.",
-    },
-  ];
-  const assigned = new Set([String(chosen.id)]);
+  const selected = initialSelected
+    ? initialSelected.map((p) => ({ ...p }))
+    : [
+        {
+          ...chosen,
+          _fieldPos: "gardienne",
+          _role: "gardienne",
+          _zone: "field",
+          _reason: "Gardienne choisie pour cette rencontre.",
+        },
+      ];
+  const assigned = new Set(selected.map((p) => String(p.id)));
   const undecided = new Map();
+  const freeCount = (zone, pos) =>
+    (formation[zone][pos] || 0) -
+    selected.filter((p) => p._zone === zone && p._fieldPos === pos).length;
   const remaining = Object.keys(GROUP_LABELS).filter(
-    (pos) =>
-      (formation.field[pos] || 0) +
-        (formation.bench[pos] || 0) -
-        (pos === "gardienne" ? 1 : 0) >
-      0,
+    (pos) => freeCount("field", pos) + freeCount("bench", pos) > 0,
   );
   const candidatesFor = (pos) =>
     input.filter(
@@ -564,9 +718,8 @@ function selectFormation(input, trainings, goalieId, evaluations, formation) {
     // versatile player can cover a scarce position instead of blocking a specialist.
     remaining.sort((a, b) => candidatesFor(a).length - candidatesFor(b).length);
     const pos = remaining.shift();
-    const fieldCount =
-      (formation.field[pos] || 0) - (pos === "gardienne" ? 1 : 0);
-    const capacity = fieldCount + (formation.bench[pos] || 0);
+    const fieldCount = freeCount("field", pos);
+    const capacity = fieldCount + freeCount("bench", pos);
     const candidates = candidatesFor(pos);
     const baseCompare = (a, b) =>
       b.pres3 - a.pres3 ||
